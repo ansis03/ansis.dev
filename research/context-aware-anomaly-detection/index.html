@@ -1,0 +1,79 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Context-aware anomaly detection in single-person households · Hyungsuk Lee</title><meta name="description" content="Turning six low-density ambient sensors into a person's daily routine, and flagging the days that are unusual for that person, with no cameras or wearables. Per-person context changed which days were flagged, but a simpler global baseline scored higher on hand-labeled days."><link rel="canonical" href="https://ansis.dev/research/context-aware-anomaly-detection/"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><meta property="og:title" content="Context-aware anomaly detection in single-person households · Hyungsuk Lee"><meta property="og:description" content="Turning six low-density ambient sensors into a person's daily routine, and flagging the days that are unusual for that person, with no cameras or wearables. Per-person context changed which days were flagged, but a simpler global baseline scored higher on hand-labeled days."><meta property="og:type" content="website"><meta property="og:url" content="https://ansis.dev/research/context-aware-anomaly-detection/"><meta property="og:image" content="https://ansis.dev/og.png"><meta property="og:image:width" content="600"><meta property="og:image:height" content="600"><meta name="twitter:card" content="summary"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&display=swap"><link rel="stylesheet" href="/_astro/Base.CQFf3bfv.css"><style>.prose img.zoomable{cursor:zoom-in}.zoom-overlay{z-index:100;opacity:0;cursor:zoom-out;background:#f8f9f7f7;transition:opacity .25s;position:fixed;inset:0}.zoom-overlay.on{opacity:1}.zoom-img{z-index:101;transform-origin:50%;cursor:zoom-out;max-width:none;margin:0;transition:transform .25s;position:fixed}@media (prefers-reduced-motion:reduce){.zoom-overlay,.zoom-img{transition:none}}
+</style></head><body><header class="top"><div class="in"><a class="brand" href="/">Hyungsuk Lee</a><nav><a href="/">Home</a><a href="/research/" aria-current="page">Research</a></nav></div></header><article class="post"><header><p class="crumb"><a href="/research/">Research</a></p><h1>Context-⁠aware anomaly detection in single-⁠person households</h1><p class="dek">Turning six low-density ambient sensors into a person&#39;s daily routine, and flagging the days that are unusual for that person, with no cameras or wearables. Per-person context changed which days were flagged, but a simpler global baseline scored higher on hand-labeled days.</p><p class="meta">Undergraduate research assistant. CSDC Lab, Dongguk University. Advisor: Prof. Junho Jeong. Aug 2025 – present.</p></header><dl class="glance"><dt>Data</dt><dd>20 single-person households in a community care program in Jeju, with six sensors: door contact, PIR, radar, respiration, heart rate, and illuminance. Collected by the program operator with prior consent; secondary analysis of de-identified data, exempted by the Dongguk&nbsp;University IRB.</dd><dt>Models</dt><dd>Per-person thresholds from K-Means and the interquartile range, rules for outing and sleep, and an Isolation Forest for each of a person's routine groups, compared with one Isolation Forest over all days.</dd><dt>Outputs</dt><dd>Three papers (IEEE KST 2026, Journal of KIIS, KIIS&nbsp;2025&nbsp;Autumn&nbsp;Conference, which received an&nbsp;Outstanding&nbsp;Paper&nbsp;Award), a&nbsp;registered computer program, and <a href="https://github.com/ansis03/context-aware-anomaly-detection">code</a>.</dd></dl><div class="prose"><p>More and more older adults live alone, and isolation can go unnoticed for days. Cameras raise privacy concerns, and wearables have to be charged and are often abandoned. Fixed ambient sensors avoid both problems, but their data is messy: batteries run out, transmissions drop, and a door can open while someone is still at home.</p>
+<p>Whether a day is unusual also depends on the person. Staying in all day says little about someone who rarely goes out, and much more about someone who goes out every morning.</p>
+<p>The question was whether six such sensors could still give a reliable picture of a person’s day, and point out the days that were unusual <em>for that person</em>.</p>
+<figure>
+  <a href="/img/overview.png"><img src="/img/overview.png" alt="Pipeline overview: data collection, behavior modeling, model training, results" width="2527" height="1113"></a>
+  <figcaption>Figure 1. The system from raw sensor logs (left) to per-model detection logs (right). The digital-twin block at the bottom right is planned work, not a result.</figcaption>
+</figure>
+<h2 id="one-timeline-from-six-sensors">One timeline from six sensors</h2>
+<p>The sensors report in different ways. Door contacts and PIR fire as sparse events, illuminance is a state that holds until it changes, and respiration and heart rate arrive as vital-sign readings. I put all six on one 1-minute timeline. States are carried forward and sparse events are zero-filled, but missing data stays missing (NaN). That keeps “the sensor was not reporting” apart from “nothing happened” (0), two cases that look the same once both are written as zero.</p>
+<h2 id="thresholds-that-fit-each-person">Thresholds that fit each person</h2>
+<p>What counts as active or dark differs from home to home. For each participant, K-Means splits activity into active and inactive (k = 2) and illuminance into dark, medium, and bright (k = 3), and the interquartile range sets that person’s normal heart rate and respiration. The thresholds differed by more than 100× between participants, so no single fixed threshold could have worked.</p>
+<h2 id="outing-sleep-and-the-rest-of-the-day">Outing, sleep, and the rest of the day</h2>
+<p>Rules then turn each day into three contexts. An outing is a door open–close pair during which no activity or vital sign is detected for at least 95% of the interval. Sleep is dark and inactive; fragments less than 20 minutes apart are merged, and vital signs tell the bedroom from the living room. The rest of the day is indoor activity.</p>
+<p>These rules separate states that look the same in the raw signals. A long absence and a long sleep both show a quiet house, and missing data and a day without events both show no readings.</p>
+<h2 id="unusual-for-whom">Unusual for whom?</h2>
+<p>To score days, I first group each participant’s days with K-Means (k = 3) into that person’s usual patterns, and then fit a separate Isolation Forest within each group. The comparison is a single Isolation Forest over all days (Global IF).</p>
+<p>Context changes the answer. Across all 20 participants, the two models agreed on only 41.7% of their top-3 anomaly days. Where they disagreed, the context-aware model flagged days that were ordinary in absolute terms but unusual for that person, such as a long outing by someone who rarely goes out.</p>
+<h2 id="the-simpler-baseline-scored-higher">The simpler baseline scored higher</h2>
+<p>On 442 days that we labeled by hand (418 normal, 24 anomalous), Global IF was better overall:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Recall</th>
+<th>Precision</th>
+<th>F1</th>
+<th>AUC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Context-aware (K-Means + IF)</td>
+<td>0.83</td>
+<td>0.13</td>
+<td>0.23</td>
+<td>0.83</td>
+</tr>
+<tr>
+<td>Global IF</td>
+<td>0.79</td>
+<td>0.19</td>
+<td>0.31</td>
+<td>0.89</td>
+</tr>
+</tbody>
+</table>
+<p class="tnote">From Table 4 of the Journal of KIIS paper.</p>
+<h2 id="what-this-means-for-a-monitoring-system">What this means for a monitoring system</h2>
+<p>The two models answer different questions. Global IF asks whether a day is unusual among all days, and the context-aware model asks whether it is unusual within that person’s usual pattern. On the hand-labeled days the first question was answered better, but the second still caught 4 of the 24 anomalous days that Global IF missed. Here, per-person context did not replace a global baseline; it found a different set of days.</p>
+<h2 id="limitations">Limitations</h2>
+<p>Both models stay at F1 0.2–0.3. With a few hundred days per person and no ground truth, unsupervised detection is hard, and a fair comparison showed that the global baseline is strong. The labels also come from our own review, not from what actually happened to the residents. A day without an outing may be rest rather than risk, and checking that would need surveys or diaries.</p>
+<h2 id="beyond-the-papers">Beyond the papers</h2>
+<p>The registered program goes one step further than the papers. It includes a retraining pipeline that augments clean normal days with the contrastive augmentation of CTAD (Kim et al., IEEE TKDE 2024), to reduce overfitting when each person has few days of data. The planned next step is a digital twin of the home that generates synthetic scenarios for training and tuning (Figure 1, bottom right).</p>
+<hr>
+<h2 id="setup">Setup</h2>
+<p>The data come from 20 single-person households in a community care program in Jeju, collected by the program operator with prior consent. We analyzed de-identified data, and the Dongguk University IRB exempted this secondary analysis. The six sensors are door contact, PIR, radar, respiration, heart rate, and illuminance. The evaluation uses 442 days that we labeled by hand, 418 normal and 24 anomalous. The pipeline is written in Python with pandas and scikit-learn.</p>
+<h2 id="papers">Papers</h2>
+<p>The KST paper covers the routine extraction, the first three sections above. The KIIS conference paper and its extended journal version cover the anomaly detection; the results above are from the journal version.</p>
+<div class="pub">
+  <p class="t">Smart Home Anomaly Detection using K-Means Dynamic Threshold and Isolation&nbsp;Forest based on Multi-Sensor Data</p>
+  <p class="au"><b>Hyungsuk Lee</b>, Haneum Lee, In-Nea Wang, Junho Jeong</p>
+  <p class="v"><i>Journal of Korean Institute of Intelligent Systems</i> 36(5):411–419, 2026. In&nbsp;Korean.</p>
+  <p class="l"><a href="https://doi.org/10.5391/JKIIS.2026.36.5.411">doi</a></p>
+</div>
+<div class="pub">
+  <p class="t">Daily Life Pattern Extraction in Single Person Households</p>
+  <p class="au"><b>Hyungsuk Lee</b>, In-Nea Wang, Junho Jeong</p>
+  <p class="v">International Conference on Knowledge and Smart Technology (KST 2026), IEEE, pp.&nbsp;350–355</p>
+  <p class="l"><a href="https://doi.org/10.1109/KST67832.2026.11431865">doi</a></p>
+</div>
+<div class="pub">
+  <p class="t">Smart Home Anomaly Detection using K-Means Dynamic Threshold and Isolation&nbsp;Forest based on Multi-Sensor Data</p>
+  <p class="au"><b>Hyungsuk Lee</b>*, Yewon Kim*, In-Nea Wang, Junho Jeong (*equal contribution)</p>
+  <p class="v"><i>Proceedings of KIIS Autumn Conference 2025</i>, 35(2):286–287. In&nbsp;Korean. Outstanding&nbsp;Paper&nbsp;Award.</p>
+</div>
+<h2 id="code">Code</h2>
+<p>The code is on <a href="https://github.com/ansis03/context-aware-anomaly-detection">GitHub</a>. The system, including the retraining pipeline, is also registered as a computer program with the Korea Copyright Commission (Reg. No. C-2026-049828, Oct. 2026; copyright held by Dongguk University Industry-Academic Cooperation Foundation).</p>
+</div><p class="back"><a href="/research/">All research</a></p></article><footer><div class="in">© 2026 Hyungsuk Lee. Last updated November 2026.</div></footer></body></html><script type="module">var e=window.matchMedia(`(prefers-reduced-motion: reduce)`).matches?0:250,t=null,n=0,r=``;function i(e){if(t)return;let i=e.getBoundingClientRect(),o=window.innerWidth,s=window.innerHeight,c=i.height/i.width,l=Math.min(o-48,e.naturalWidth),u=l*c;u>s-48&&(u=s-48,l=u/c);let d=l/i.width,f=o/2-(i.left+i.width/2),p=s/2-(i.top+i.height/2),m=document.createElement(`div`);m.className=`zoom-overlay`;let h=e.cloneNode();h.className=`zoom-img`,h.removeAttribute(`width`),h.removeAttribute(`height`),Object.assign(h.style,{left:`${i.left}px`,top:`${i.top}px`,width:`${i.width}px`,height:`${i.height}px`}),document.body.append(m,h),e.style.visibility=`hidden`,t={img:e,clone:h,overlay:m},n=window.scrollY,r=`${o}x${s}`,h.getBoundingClientRect(),m.classList.add(`on`),h.style.transform=`translate(${f}px, ${p}px) scale(${d})`,m.addEventListener(`click`,a),h.addEventListener(`click`,a)}function a(){if(!t)return;let{img:n,clone:r,overlay:i}=t;t=null,i.classList.remove(`on`),r.style.transform=``,setTimeout(()=>{r.remove(),i.remove(),n.style.visibility=``},e)}document.querySelectorAll(`.prose figure img`).forEach(e=>{e.classList.add(`zoomable`),e.addEventListener(`click`,t=>{t.preventDefault(),i(e)})}),document.addEventListener(`keydown`,e=>{e.key===`Escape`&&a()}),window.addEventListener(`scroll`,()=>{t&&Math.abs(window.scrollY-n)>40&&a()},{passive:!0}),window.addEventListener(`resize`,()=>{t&&`${window.innerWidth}x${window.innerHeight}`!==r&&a()});</script>
